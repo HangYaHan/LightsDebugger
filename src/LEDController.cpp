@@ -37,7 +37,7 @@ LEDController::LEDController(size_t count)
         {25, 900, 3000},
         {26, 0, 0}, // infrared
         {27, 0, 0}, // infrared
-        {28, 0, 0}, // infrared
+        {28, -1, -1}, // White LED, maxRadiation not defined
         {29, 0, 0}, // infrared
         {30, 625, 65000}};
 
@@ -115,7 +115,7 @@ std::vector<unsigned char> LEDController::getIntensityData() const
     data.reserve(leds_.size());
     for (const auto &led : leds_)
     {
-        data.push_back(led.getPeakWavelength() == 0 ? 0 : led.getIntensity());
+        data.push_back(led.getIntensity());
     }
     return data;
 }
