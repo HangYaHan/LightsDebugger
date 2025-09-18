@@ -73,6 +73,10 @@ void CLIApp::setupCommands()
     { handleHelp(args); };
     commands["cls"] = [this](const std::vector<std::string> &args)
     { handleClear(args); };
+    commands["lock"] = [this](const std::vector<std::string> &args)
+    { handleLock(args); };
+    commands["unlock"] = [this](const std::vector<std::string> &args)
+    { handleUnlock(args); };
 }
 
 void CLIApp::handleEmpty(const std::vector<std::string> &args)
@@ -129,7 +133,7 @@ void CLIApp::handleSetCom(const std::vector<std::string> &args)
 void CLIApp::handleLS(const std::vector<std::string> &args)
 {
     // 输出30个灯的详细信息
-    std::cout << "ID\tPeak\tMaxRad\tIntensity\tMaxIntensity\n";
+    std::cout << "ID\tPeak\tMaxRad\tIntensity\tMaxIntensity\tLocked\n";
     for (int i = 1; i <= 30; ++i)
     {
         try
@@ -139,7 +143,8 @@ void CLIApp::handleLS(const std::vector<std::string> &args)
                       << led.getPeakWavelength() << "\t"
                       << led.getMaxRadiation() << "\t"
                       << (int)led.getIntensity() << "\t\t"
-                      << (int)led.getMaxIntensity() << "\n";
+                      << (int)led.getMaxIntensity() << "\t\t"
+                      << (led.isLocked() ? "Yes" : "No") << "\n";
         }
         catch (...)
         {
@@ -158,8 +163,16 @@ void CLIApp::handleSet(const std::vector<std::string> &args)
         int value = std::stoi(args[2]);
         try
         {
-            controller_.getById(id).setIntensity((unsigned char)value);
-            std::cout << "[Info] LED #" << id << " intensity set to " << value << "\n";
+            if (controller_.getById(id).isLocked())
+            {
+                std::cout << "[Warning] LED #" << id << " is locked. Intensity not changed.\n";
+                return;
+            }
+            else
+            {
+                controller_.getById(id).setIntensity((unsigned char)value);
+                std::cout << "[Info] LED #" << id << " intensity set to " << value << "\n";
+            }
         }
         catch (...)
         {
@@ -173,8 +186,16 @@ void CLIApp::handleSet(const std::vector<std::string> &args)
         int value = std::stoi(args[2]);
         try
         {
-            controller_.getByPeak(peak).setIntensity((unsigned char)value);
-            std::cout << "[Info] LED with peak " << peak << " intensity set to " << value << "\n";
+            if (controller_.getByPeak(peak).isLocked())
+            {
+                std::cout << "[Warning] LED with peak " << peak << " is locked. Intensity not changed.\n";
+                return;
+            }
+            else
+            {
+                controller_.getByPeak(peak).setIntensity((unsigned char)value);
+                std::cout << "[Info] LED with peak " << peak << " intensity set to " << value << "\n";
+            }
         }
         catch (...)
         {
@@ -200,6 +221,11 @@ void CLIApp::handleSetA(const std::vector<std::string> &args)
     {
         try
         {
+            if (controller_.getById(i).isLocked())
+            {
+                std::cout << "[Warning] LED #" << i << " is locked. Intensity not changed.\n";
+                continue;
+            }
             controller_.getById(i).setIntensity((unsigned char)value);
         }
         catch (...)
@@ -387,7 +413,11 @@ void CLIApp::handleHelp(const std::vector<std::string> &args)
                  "  save            : Save max intensities to file\n"
                  "  load            : Load max intensities from file\n"
                  "  help            : Show this help\n"
-                 "  cls           : Clear all LED intensities\n";
+                 "  lock l<x>       : Lock LED by id (prevent changes)\n"
+                 "  lock <peak>     : Lock LED by peak (prevent changes)\n"
+                 "  unlock l<x>     : Unlock LED by id (allow changes)\n"
+                 "  unlock <peak>   : Unlock LED by peak (allow changes)\n"
+                 "  cls             : Clear all LED intensities\n";
 }
 
 void CLIApp::handleError(const std::vector<std::string> &args)
@@ -402,4 +432,78 @@ void CLIApp::handleClear(const std::vector<std::string> &args)
 #else
     system("clear");
 #endif
+}
+
+void CLIApp::handleLock(const std::vector<std::string> &args)
+{
+    // lock l<x> 或 lock <peak>
+    if (args.size() == 2 && args[1].size() > 1 && args[1][0] == 'l')
+    {
+        // lock l<x>
+        int id = std::stoi(args[1].substr(1));
+        try
+        {
+            controller_.getById(id).lock();
+            std::cout << "[Info] LED #" << id << " locked.\n";
+        }
+        catch (...)
+        {
+            std::cout << "[Error] Invalid LED id.\n";
+        }
+    }
+    else if (args.size() == 2)
+    {
+        // lock <peak>
+        float peak = std::stof(args[1]);
+        try
+        {
+            controller_.getByPeak(peak).lock();
+            std::cout << "[Info] LED with peak " << peak << " locked.\n";
+        }
+        catch (...)
+        {
+            std::cout << "[Error] Invalid peak value.\n";
+        }
+    }
+    else
+    {
+        std::cout << "[Usage] lock l<x>  or  lock <peak>\n";
+    }
+}
+
+void CLIApp::handleUnlock(const std::vector<std::string> &args)
+{
+    // unlock l<x> 或 unlock <peak>
+    if (args.size() == 2 && args[1].size() > 1 && args[1][0] == 'l')
+    {
+        // unlock l<x>
+        int id = std::stoi(args[1].substr(1));
+        try
+        {
+            controller_.getById(id).unlock();
+            std::cout << "[Info] LED #" << id << " unlocked.\n";
+        }
+        catch (...)
+        {
+            std::cout << "[Error] Invalid LED id.\n";
+        }
+    }
+    else if (args.size() == 2)
+    {
+        // unlock <peak>
+        float peak = std::stof(args[1]);
+        try
+        {
+            controller_.getByPeak(peak).unlock();
+            std::cout << "[Info] LED with peak " << peak << " unlocked.\n";
+        }
+        catch (...)
+        {
+            std::cout << "[Error] Invalid peak value.\n";
+        }
+    }
+    else
+    {
+        std::cout << "[Usage] unlock l<x>  or  unlock <peak>\n";
+    }
 }

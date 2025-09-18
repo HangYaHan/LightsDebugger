@@ -31,6 +31,8 @@ private:
     void handleHelp(const std::vector<std::string> &args);
     void handleError(const std::vector<std::string> &args);
     void handleClear(const std::vector<std::string> &args);
+    void handleLock(const std::vector<std::string> &args);
+    void handleUnlock(const std::vector<std::string> &args);
 
     LEDController controller_;
     SerialInterface serial_;

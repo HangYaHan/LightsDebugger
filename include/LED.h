@@ -20,12 +20,17 @@ public:
     float getPeakWavelength() const;
     float getMaxRadiation() const;
 
+    void lock();
+    void unlock();
+    bool isLocked() const;
+
 private:
     int id_;
     float peakWavelength_;
     float maxRadiation_;
     unsigned char intensity_;
     unsigned char maxIntensity_ = 255;
+    bool locked_ = false;
 };
 
 #endif // LED_H

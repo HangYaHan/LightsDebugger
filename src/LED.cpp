@@ -22,6 +22,8 @@ unsigned char LED::getIntensity() const
 
 void LED::setIntensity(unsigned char value)
 {
+    if (locked_ == true)
+        return;
     intensity_ = value;
 }
 
@@ -54,4 +56,19 @@ float LED::getPeakWavelength() const
 float LED::getMaxRadiation() const
 {
     return maxRadiation_;
+}
+
+void LED::lock()
+{
+    locked_ = true;
+}
+
+void LED::unlock()
+{
+    locked_ = false;
+}
+
+bool LED::isLocked() const
+{
+    return locked_;
 }
