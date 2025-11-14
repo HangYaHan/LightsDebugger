@@ -415,8 +415,10 @@ void CLIApp::handleHelp(const std::vector<std::string> &args)
                  "  help            : Show this help\n"
                  "  lock l<x>       : Lock LED by id (prevent changes)\n"
                  "  lock <peak>     : Lock LED by peak (prevent changes)\n"
+                 "  lock all        : Lock all LEDs (prevent changes)\n"
                  "  unlock l<x>     : Unlock LED by id (allow changes)\n"
                  "  unlock <peak>   : Unlock LED by peak (allow changes)\n"
+                 "  unlock all      : Unlock all LEDs (allow changes)\n"
                  "  cls             : Clear all LED intensities\n";
 }
 
@@ -436,6 +438,24 @@ void CLIApp::handleClear(const std::vector<std::string> &args)
 
 void CLIApp::handleLock(const std::vector<std::string> &args)
 {
+    // lock all
+    if (args.size() == 2 && args[1] == "all")
+    {
+        for (int i = 1; i <= 30; ++i)
+        {
+            try
+            {
+                controller_.getById(i).lock();
+            }
+            catch (...)
+            {
+                // 忽略无效 id
+            }
+        }
+        std::cout << "[Info] All LEDs locked.\n";
+        return;
+    }
+
     // lock l<x> 或 lock <peak>
     if (args.size() == 2 && args[1].size() > 1 && args[1][0] == 'l')
     {
@@ -473,6 +493,24 @@ void CLIApp::handleLock(const std::vector<std::string> &args)
 
 void CLIApp::handleUnlock(const std::vector<std::string> &args)
 {
+    // unlock all
+    if (args.size() == 2 && args[1] == "all")
+    {
+        for (int i = 1; i <= 30; ++i)
+        {
+            try
+            {
+                controller_.getById(i).unlock();
+            }
+            catch (...)
+            {
+                // 忽略无效 id
+            }
+        }
+        std::cout << "[Info] All LEDs unlocked.\n";
+        return;
+    }
+
     // unlock l<x> 或 unlock <peak>
     if (args.size() == 2 && args[1].size() > 1 && args[1][0] == 'l')
     {
