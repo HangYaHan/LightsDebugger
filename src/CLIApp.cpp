@@ -158,6 +158,7 @@ void CLIApp::handleEmpty(const std::vector<std::string> &args)
 
     if (serial_.sendData(packet))
     {
+        maybeRecordPacket(packet);
         std::cout << "[Info] Random intensity generated and sent.\n";
     }
     else
@@ -381,6 +382,7 @@ void CLIApp::handleSend(const std::vector<std::string> &args)
 
     if (serial_.sendData(packet))
     {
+        maybeRecordPacket(packet);
         std::cout << "[Info] Data sent to serial port.\n";
     }
     else
@@ -418,6 +420,10 @@ void CLIApp::handleDo(const std::vector<std::string> &args)
         {
             std::cout << "[Error] Serial port not open or send failed.\n";
             break;
+        }
+        else
+        {
+            maybeRecordPacket(packet);
         }
         std::cout << "[Info] [" << (i + 1) << "/" << count << "] Data sent.\n";
         std::this_thread::sleep_for(std::chrono::seconds(1));
