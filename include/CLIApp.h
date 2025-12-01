@@ -7,6 +7,7 @@
 #include <vector>
 #include <map>
 #include <functional>
+#include <fstream>
 
 class CLIApp
 {
@@ -33,6 +34,12 @@ private:
     void handleClear(const std::vector<std::string> &args);
     void handleLock(const std::vector<std::string> &args);
     void handleUnlock(const std::vector<std::string> &args);
+    void handleRecord(const std::vector<std::string> &args);
+    void handleReplay(const std::vector<std::string> &args);
+
+    // helpers
+    void maybeRecordPacket(const std::vector<unsigned char> &packet);
+    bool readNextReplayPacket(std::vector<unsigned char> &packet);
 
     LEDController controller_;
     SerialInterface serial_;
@@ -40,6 +47,16 @@ private:
     std::string lastUsedPort_;
     std::string configFile_ = "led_config.cfg";
     std::map<std::string, std::function<void(const std::vector<std::string> &)>> commands;
+
+    // recording state
+    bool isRecording_ = false;
+    std::string recordFilePath_ = "record.txt";
+    std::ofstream recordFile_;
+
+    // replay state
+    bool isReplaying_ = false;
+    std::string replayFilePath_ = "record.txt";
+    std::ifstream replayFile_;
 };
 
 #endif // CLIAPP_H

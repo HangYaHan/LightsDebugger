@@ -7,6 +7,8 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <fstream>
+#include <iomanip>
 
 CLIApp::CLIApp()
 {
@@ -26,6 +28,23 @@ void CLIApp::run()
         std::string arg;
         while (iss >> arg)
             args.push_back(arg);
+
+        // 在回放模式下，仅支持空输入(回放下一帧)和 replay -e
+        if (isReplaying_)
+        {
+            if (args.empty())
+            {
+                handleEmpty(args);
+                continue;
+            }
+            if (!args.empty() && args[0] == "replay")
+            {
+                handleReplay(args);
+                continue;
+            }
+            std::cout << "[Warn] In replay mode: only (empty) or 'replay -e' supported.\n";
+            continue;
+        }
 
         if (args.empty())
         {
@@ -77,11 +96,47 @@ void CLIApp::setupCommands()
     { handleLock(args); };
     commands["unlock"] = [this](const std::vector<std::string> &args)
     { handleUnlock(args); };
+    commands["record"] = [this](const std::vector<std::string> &args)
+    { handleRecord(args); };
+    commands["replay"] = [this](const std::vector<std::string> &args)
+    { handleReplay(args); };
 }
 
 void CLIApp::handleEmpty(const std::vector<std::string> &args)
 {
-    // 空命令：随机生成强度并发送到串口
+    // 空命令：在回放模式下发送下一帧；否则随机并发送
+    if (isReplaying_)
+    {
+        if (!serial_.isOpen())
+        {
+            std::cout << "[Error] Serial port not open. Use setcom to set port.\n";
+            return;
+        }
+        std::vector<unsigned char> packet;
+        if (!readNextReplayPacket(packet))
+        {
+            std::cout << "[Info] Replay finished or no more data. Use 'replay -e' to exit.\n";
+            return;
+        }
+
+        std::cout << "[Debug] Send packet: ";
+        for (auto b : packet)
+            std::cout << std::hex << std::uppercase << (int)b << " ";
+        std::cout << std::dec << std::endl;
+
+        if (serial_.sendData(packet))
+        {
+            maybeRecordPacket(packet);
+            std::cout << "[Info] Replay frame sent.\n";
+        }
+        else
+        {
+            std::cout << "[Error] Failed to send data to serial port.\n";
+        }
+        return;
+    }
+
+    // 非回放：随机生成并发送
     controller_.randomizeAll();
     auto data = controller_.getIntensityData();
     if (!serial_.isOpen())
@@ -413,6 +468,10 @@ void CLIApp::handleHelp(const std::vector<std::string> &args)
                  "  save            : Save max intensities to file\n"
                  "  load            : Load max intensities from file\n"
                  "  help            : Show this help\n"
+                 "  record -s [f]   : Start recording sent packets to file f (default record.txt)\n"
+                 "  record -e       : Stop recording\n"
+                 "  replay -s [f]   : Start replay from file f (default record.txt)\n"
+                 "  replay -e       : Stop replay mode\n"
                  "  lock l<x>       : Lock LED by id (prevent changes)\n"
                  "  lock <peak>     : Lock LED by peak (prevent changes)\n"
                  "  lock all        : Lock all LEDs (prevent changes)\n"
@@ -544,4 +603,140 @@ void CLIApp::handleUnlock(const std::vector<std::string> &args)
     {
         std::cout << "[Usage] unlock l<x>  or  unlock <peak>\n";
     }
+}
+
+void CLIApp::handleRecord(const std::vector<std::string> &args)
+{
+    // record -s [file]  或  record -e
+    if (args.size() < 2)
+    {
+        std::cout << "[Error] Usage: record -s [filename]  |  record -e\n";
+        return;
+    }
+    if (args[1] == "-s")
+    {
+        std::string path = (args.size() >= 3) ? args[2] : std::string("record.txt");
+        if (recordFile_.is_open())
+        {
+            recordFile_.close();
+        }
+        recordFile_.open(path, std::ios::out | std::ios::trunc);
+        if (!recordFile_.is_open())
+        {
+            std::cout << "[Error] Failed to open record file: " << path << "\n";
+            return;
+        }
+        recordFilePath_ = path;
+        isRecording_ = true;
+        std::cout << "[Info] Recording started to '" << recordFilePath_ << "'.\n";
+    }
+    else if (args[1] == "-e")
+    {
+        if (!isRecording_)
+        {
+            std::cout << "[Info] Recording has not been started. Use 'record -s [file]'.\n";
+            return;
+        }
+        if (recordFile_.is_open())
+            recordFile_.close();
+        isRecording_ = false;
+        std::cout << "[Info] Recording stopped.\n";
+    }
+    else
+    {
+        std::cout << "[Error] Usage: record -s [filename]  |  record -e\n";
+    }
+}
+
+void CLIApp::handleReplay(const std::vector<std::string> &args)
+{
+    // replay -s [file]  或  replay -e
+    if (args.size() < 2)
+    {
+        std::cout << "[Error] Usage: replay -s [filename]  |  replay -e\n";
+        return;
+    }
+    if (args[1] == "-s")
+    {
+        std::string path = (args.size() >= 3) ? args[2] : std::string("record.txt");
+        if (replayFile_.is_open())
+            replayFile_.close();
+        replayFile_.open(path);
+        if (!replayFile_.is_open())
+        {
+            std::cout << "[Error] Failed to open replay file: " << path << "\n";
+            return;
+        }
+        replayFilePath_ = path;
+        isReplaying_ = true;
+        std::cout << "[Info] Replay started from '" << replayFilePath_ << "'. Press Enter to send next frame.\n";
+    }
+    else if (args[1] == "-e")
+    {
+        if (!isReplaying_)
+        {
+            std::cout << "[Info] Replay has not been started. Use 'replay -s [file]'.\n";
+            return;
+        }
+        if (replayFile_.is_open())
+            replayFile_.close();
+        isReplaying_ = false;
+        std::cout << "[Info] Replay stopped.\n";
+    }
+    else
+    {
+        std::cout << "[Error] Usage: replay -s [filename]  |  replay -e\n";
+    }
+}
+
+void CLIApp::maybeRecordPacket(const std::vector<unsigned char> &packet)
+{
+    if (!isRecording_ || !recordFile_.is_open())
+        return;
+    // 按行记录：32个两位十六进制数（大写，零填充）
+    for (size_t i = 0; i < packet.size(); ++i)
+    {
+        if (i)
+            recordFile_ << ' ';
+        recordFile_ << std::uppercase << std::hex << std::setw(2) << std::setfill('0') << (int)packet[i];
+    }
+    recordFile_ << std::dec << "\n";
+    recordFile_.flush();
+}
+
+bool CLIApp::readNextReplayPacket(std::vector<unsigned char> &packet)
+{
+    if (!replayFile_.is_open())
+        return false;
+    std::string line;
+    if (!std::getline(replayFile_, line))
+        return false;
+    std::istringstream iss(line);
+    std::string tok;
+    std::vector<unsigned char> bytes;
+    while (iss >> tok)
+    {
+        try
+        {
+            int v = std::stoi(tok, nullptr, 16);
+            if (v < 0)
+                v = 0;
+            if (v > 255)
+                v = 255;
+            bytes.push_back(static_cast<unsigned char>(v));
+        }
+        catch (...)
+        {
+            // 非法行，标记失败
+            bytes.clear();
+            break;
+        }
+    }
+    if (bytes.size() != 32)
+    {
+        std::cout << "[Error] Invalid replay line (expect 32 bytes).\n";
+        return false;
+    }
+    packet = std::move(bytes);
+    return true;
 }
