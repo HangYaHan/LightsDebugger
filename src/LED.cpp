@@ -7,7 +7,7 @@ LED::LED(int id, float peakWavelength, float maxRadiation)
       intensity_(0),
       maxIntensity_(255)
 {
-    // if the light is infrared
+    // if the light is unregistered, set intensity and max intensity to 0
     if (peakWavelength_ == 0)
     {
         intensity_ = 0;
